@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import routes from './routes/index.js';
 
 // loads environment variables from .env file
 dotenv.config();
@@ -16,6 +17,8 @@ app.use(express.json()); // allows server to parse JSON data from frontend
 app.get('/api/message', (req, res) => {
   res.json({ message: 'Hello from the backend!' });
 });
+
+app.use('/api', routes);
 
 // start server
 app.listen(PORT, () => {
