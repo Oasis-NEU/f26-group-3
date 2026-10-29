@@ -7,6 +7,7 @@ import { Bubble } from "@/components/chat-booth/bubble";
 import { BoothLink, ChatHeader } from "@/components/chat-booth/chat-header";
 import { PhotoStrip } from "@/components/chat-booth/photo-strip";
 import { focusRing } from "@/components/chat-booth/styles";
+import { SidequestMark } from "@/components/sidequest-mark";
 import { clearStrip, getStripJson, parseStrip, subscribeHandoff } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ export function DoneView() {
             <PhotoStrip picks={strip.interests} />
           </div>
           <section aria-label="You're in" className="flex flex-1 flex-col gap-2 py-4 md:max-w-md">
+            <SidequestMark className="mb-2 h-14 w-16 motion-safe:animate-in motion-safe:zoom-in-90" />
             <Bubble from="app">you&apos;re in, {strip.firstName}! 🎉</Bubble>
             <Bubble from="app">your strip is printed. we&apos;ll use it to find people for your first sidequest.</Bubble>
             <Bubble from="app">see you out there 🗺️</Bubble>

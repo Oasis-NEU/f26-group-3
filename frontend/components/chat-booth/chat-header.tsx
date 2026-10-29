@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/chat-booth/styles";
+import { SidequestMark } from "@/components/sidequest-mark";
 
 type ChatHeaderProps = {
   title: string;
@@ -9,15 +10,11 @@ type ChatHeaderProps = {
   onStartOver?: () => void;
 };
 
-// Group-chat style header: stacked avatars, chat name, subtitle, start over.
+// Group-chat style header: logo as the chat avatar, chat name, subtitle, start over.
 export function ChatHeader({ title, subtitle, onStartOver }: ChatHeaderProps) {
   return (
     <header className="sticky top-0 z-10 -mx-4 flex items-center gap-3 border-b border-ink/10 bg-page/95 px-4 py-3 backdrop-blur-sm">
-      <div aria-hidden className="flex shrink-0 -space-x-2">
-        <span className="size-6 rounded-full border-2 border-page bg-me" />
-        <span className="size-6 rounded-full border-2 border-page bg-frame2" />
-        <span className="size-6 rounded-full border-2 border-page bg-frame3" />
-      </div>
+      <SidequestMark className="h-8 w-9" />
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-[15px] leading-tight font-bold">{title}</h1>
         <p className="truncate text-xs text-soft">{subtitle}</p>
