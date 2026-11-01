@@ -1,69 +1,200 @@
-import Image from "next/image";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { focusRing } from "@/components/chat-booth/styles";
+import { SidequestMark } from "@/components/sidequest-mark";
+import { Bubble } from "@/components/chat-booth/bubble";
+import { PhotoStrip } from "@/components/chat-booth/photo-strip";
+import { INTERESTS, MAX_INTERESTS } from "@/lib/signup-options";
+
+const primaryCta = cn(
+  "inline-flex items-center justify-center rounded-full bg-me px-5 py-3 text-sm font-semibold text-ink transition-opacity hover:opacity-90",
+  focusRing,
+);
+const secondaryCta = cn(
+  "inline-flex items-center justify-center rounded-full border-[1.5px] border-ink/25 px-5 py-3 text-sm font-semibold text-ink hover:border-ink",
+  focusRing,
+);
+
+const STEPS = [
+  {
+    title: "sign up with your husky email",
+    body: "only @northeastern.edu addresses get in, so everyone here is a real student.",
+    fill: "bg-frame1",
+  },
+  {
+    title: `pick ${MAX_INTERESTS} sidequests`,
+    body: "concerts, study groups, cafe hopping. each pick prints into your photo strip.",
+    fill: "bg-frame2",
+  },
+  {
+    title: "find your people",
+    body: "see who's down for the same things and make plans that actually happen.",
+    fill: "bg-frame3",
+  },
+];
+
+const GALLERY = [
+  { label: "students at a concert", rotate: "-rotate-2" },
+  { label: "study group in Snell Library", rotate: "rotate-1" },
+  { label: "friends at a cafe near campus", rotate: "-rotate-1" },
+];
+
+// Stand-in for a real photo until we have assets. Swap for next/image with the
+// same aspect ratio so the layout doesn't shift.
+function ImagePlaceholder({ label, className }: { label: string; className?: string }) {
+  return (
+    <div
+      role="img"
+      aria-label={`placeholder: ${label}`}
+      className={cn(
+        "flex items-center justify-center rounded-2xl border-[1.5px] border-dashed border-ink/30 bg-white/60 p-4 text-center text-xs font-medium text-soft",
+        className,
+      )}
+    >
+      <span>
+        <span aria-hidden className="mb-1 block text-2xl">📷</span>
+        {label}
+      </span>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+    <div className="flex flex-1 flex-col bg-page font-sans text-ink">
+      <header className="sticky top-0 z-10 border-b border-ink/10 bg-page/95 backdrop-blur-sm">
+        <nav aria-label="Main" className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+          <Link href="/" className={cn("flex items-center gap-2 rounded-md", focusRing)}>
+            <SidequestMark className="h-8 w-9" />
+            <span className="text-lg font-bold">sidequest</span>
+          </Link>
+          <div className="ml-auto flex items-center gap-2">
+            <Link href="/login" className={cn("rounded-full px-3 py-2 text-sm font-semibold hover:bg-ink/5", focusRing)}>
+              log in
+            </Link>
+            <Link href="/signup" className={cn(primaryCta, "px-4 py-2")}>
+              sign up
+            </Link>
+          </div>
+        </nav>
+      </header>
+
+      <main className="flex-1">
+        {/* Hero */}
+        <section className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-14 md:grid-cols-2 md:py-20">
+          <div className="flex flex-col gap-5">
+            <p className="w-fit rounded-full bg-frame1 px-3 py-1 text-xs font-semibold">for northeastern students</p>
+            <h1 className="text-4xl leading-tight font-bold tracking-tight md:text-5xl">
+              find people to do things with.
+            </h1>
+            <p className="max-w-md text-base text-soft">
+              sidequest matches you with other huskies who are into the same stuff, from concert buddies to late-night
+              study groups.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/signup" className={primaryCta}>
+                start your sidequest →
+              </Link>
+              <Link href="/login" className={secondaryCta}>
+                i have an account
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative mx-auto w-full max-w-md">
+            <ImagePlaceholder label="hero photo: friends hanging out on campus (4:3)" className="aspect-[4/3] w-full pr-28 md:pr-36" />
+            <PhotoStrip
+              picks={INTERESTS.slice(0, MAX_INTERESTS)}
+              className="absolute -right-2 -bottom-10 scale-75 md:-right-8 md:scale-90"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section aria-labelledby="how-heading" className="border-y border-ink/10 bg-white">
+          <div className="mx-auto max-w-5xl px-4 py-14">
+            <h2 id="how-heading" className="text-2xl font-bold">
+              how it works
+            </h2>
+            <ol className="mt-8 grid gap-4 md:grid-cols-3">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="flex flex-col gap-3 rounded-2xl bg-page p-5">
+                  <span
+                    aria-hidden
+                    className={cn("flex size-9 items-center justify-center rounded-full text-sm font-bold", step.fill)}
+                  >
+                    {i + 1}
+                  </span>
+                  <h3 className="text-base font-bold">{step.title}</h3>
+                  <p className="text-sm text-soft">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* Product preview: the signup chat */}
+        <section aria-labelledby="chat-heading" className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-14 md:grid-cols-2">
+          <div className="flex flex-col gap-4">
+            <h2 id="chat-heading" className="text-2xl font-bold">
+              signing up feels like texting a friend
+            </h2>
+            <p className="text-sm text-soft">
+              no long forms. answer a few quick questions, pick your sidequests, and you&apos;re in.
+            </p>
+            <ul aria-label="Popular sidequests" className="flex flex-wrap gap-2">
+              {INTERESTS.map((interest) => (
+                <li
+                  key={interest}
+                  className="rounded-full border-[1.5px] border-ink bg-white px-3.5 py-1.5 text-[13.5px] font-medium"
+                >
+                  {interest}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div aria-hidden className="flex flex-col gap-2 rounded-3xl bg-white/60 p-5 ring-1 ring-ink/10">
+            <Bubble from="app">hey! what should we call you?</Bubble>
+            <Bubble from="me">sam</Bubble>
+            <Bubble from="app">nice to meet you, sam. pick {MAX_INTERESTS} sidequests you&apos;re into 📸</Bubble>
+            <Bubble from="me">concert buddies, cafe hopping, gym buddies</Bubble>
+          </div>
+        </section>
+
+        {/* Gallery */}
+        <section aria-labelledby="gallery-heading" className="mx-auto max-w-5xl px-4 pb-14">
+          <h2 id="gallery-heading" className="text-2xl font-bold">
+            sidequests happening around campus
+          </h2>
+          <div className="mt-8 grid grid-cols-3 gap-3 sm:gap-6">
+            {GALLERY.map((photo) => (
+              <ImagePlaceholder
+                key={photo.label}
+                label={`${photo.label} (4:5)`}
+                className={cn("aspect-[4/5] bg-white p-2 shadow-sm sm:p-4", photo.rotate)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Closing CTA */}
+        <section className="px-4 pb-16">
+          <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-3xl bg-ink px-6 py-12 text-center text-white">
+            <h2 className="text-2xl font-bold md:text-3xl">your next sidequest is waiting.</h2>
+            <p className="max-w-md text-sm text-white/75">it takes about two minutes to make your strip.</p>
+            <Link href="/signup" className={cn(primaryCta, "focus-visible:ring-white focus-visible:ring-offset-ink")}>
+              sign up free →
+            </Link>
+          </div>
+        </section>
       </main>
+
+      <footer className="border-t border-ink/10">
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-soft sm:flex-row">
+          <p>sidequest · made by students, for students</p>
+          <p>northeastern university students only</p>
+        </div>
+      </footer>
     </div>
   );
 }
