@@ -30,7 +30,7 @@ export async function getUsers() {
 // logging users in: it would hold one student's session and could
 // accidentally use it for another student's request.
 export function createAuthClient() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
