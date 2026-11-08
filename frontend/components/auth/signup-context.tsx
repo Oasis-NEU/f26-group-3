@@ -4,14 +4,13 @@ import { Fragment, createContext, useContext, useLayoutEffect, useState } from "
 import type { SignupPayload } from "@/lib/auth";
 
 // Answers collected across /signup, /signup/details and /signup/interests.
-// Held in memory only (never storage) because it includes the password.
+// /signup/interests hands them to /verify through sessionStorage.
 
 type SignupState = SignupPayload;
 
 const EMPTY: SignupState = {
   username: "",
   email: "",
-  password: "",
   firstName: "",
   gender: "",
   year: "",
@@ -33,8 +32,7 @@ export function SignupProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState(0);
 
   // Next keeps left pages mounted but hidden. When the user leaves /signup/*
-  // (e.g. after "Print my strip"), wipe the answers so the password doesn't
-  // linger in memory and the next visit starts fresh.
+  // (e.g. after "Print my strip"), wipe the answers so the next visit starts fresh.
   useLayoutEffect(() => {
     return () => {
       setData(EMPTY);

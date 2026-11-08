@@ -8,14 +8,13 @@ import { BoothLink, ChatHeader } from "@/components/chat-booth/chat-header";
 import { Chip } from "@/components/chat-booth/chip";
 import { PhotoStrip } from "@/components/chat-booth/photo-strip";
 import { useSignup } from "@/components/auth/signup-context";
-import { AuthError, authApi, setPendingEmail, setStrip, type SignupPayload } from "@/lib/auth";
+import { AuthError, authApi, setStrip, type SignupPayload } from "@/lib/auth";
 import { CAMPUSES, GENDERS, INTERESTS, MAX_INTERESTS, YEARS } from "@/lib/signup-options";
 import {
   validateChoice,
   validateEmail,
   validateFirstName,
   validateMajor,
-  validatePassword,
   validateUsername,
 } from "@/lib/validation";
 
@@ -26,11 +25,10 @@ const EARLIER_ANSWERS: {
   key: keyof SignupPayload;
   label: string;
   step: { href: string; name: string };
-  check: (v: string, d: SignupPayload) => string | null;
+  check: (v: string) => string | null;
 }[] = [
   { key: "username", label: "username", step: { href: "/signup", name: "step 1" }, check: validateUsername },
   { key: "email", label: "email", step: { href: "/signup", name: "step 1" }, check: validateEmail },
-  { key: "password", label: "password", step: { href: "/signup", name: "step 1" }, check: (v, d) => validatePassword(v, d.email) },
   { key: "firstName", label: "first name", step: { href: "/signup/details", name: "step 2" }, check: validateFirstName },
   { key: "gender", label: "gender", step: { href: "/signup/details", name: "step 2" }, check: validateChoice(GENDERS, "gender") },
   { key: "year", label: "year", step: { href: "/signup/details", name: "step 2" }, check: validateChoice(YEARS, "year") },
@@ -70,7 +68,7 @@ export function InterestsForm() {
 
     for (const { key, label, step, check } of EARLIER_ANSWERS) {
       const value = data[key] as string;
-      if (!value || check(value, data)) {
+      if (!value || check(value)) {
         note(
           <>
             hmm, your {label} is {value ? "not valid" : "missing"}. <BoothLink href={step.href}>go back to {step.name}</BoothLink>{" "}
@@ -83,13 +81,25 @@ export function InterestsForm() {
 
     setPending(true);
     try {
-      await authApi.signup(data);
-      setPendingEmail(data.email);
+      // The student verified their email at /signup/verify, so this request
+      // carries their session cookies.
+      await authApi.saveProfile(data);
       setStrip({ firstName: data.firstName.trim(), interests: picks });
-      // Leaving /signup/* makes SignupProvider wipe the answers, password included.
-      router.push("/verify");
+      router.push("/signup/done");
     } catch (err) {
-      if (err instanceof AuthError && err.code === "USERNAME_TAKEN") {
+      if (err instanceof AuthError && err.status === 401) {
+        note(
+          <>
+            hmm, your session ran out. <BoothLink href="/signup">start again from step 1</BoothLink>.
+          </>,
+        );
+      } else if (err instanceof AuthError && err.code === "ALREADY_ONBOARDED") {
+        note(
+          <>
+            {err.message} <BoothLink href="/">head home</BoothLink>
+          </>,
+        );
+      } else if (err instanceof AuthError && err.code === "USERNAME_TAKEN") {
         note(
           <>
             hmm, {err.message} <BoothLink href="/signup">pick another in step 1</BoothLink>.

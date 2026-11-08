@@ -11,7 +11,6 @@ import {
   authApi,
   getHandoffVersion,
   getPendingEmail,
-  getStripJson,
   subscribeHandoff,
 } from "@/lib/auth";
 import { DEMO_MODE, LOGIN_REDIRECT } from "@/lib/config";
@@ -30,11 +29,11 @@ const steps: ChatStep[] = [
   },
 ];
 
+// /verify: the code step of login. Signup has its own (/signup/verify).
 export function VerifyForm() {
   // undefined on the server (no sessionStorage), null = nothing pending
   const email = useSyncExternalStore(subscribeHandoff, getPendingEmail, () => undefined);
-  const fromSignup = useSyncExternalStore(subscribeHandoff, () => getStripJson() !== null, () => false);
-  // New hand-off data (someone else signing up) starts the chat over.
+  // New hand-off data (another login) starts the chat over.
   const version = useSyncExternalStore(subscribeHandoff, getHandoffVersion, () => 0);
 
   if (email === undefined) return null;
@@ -43,24 +42,41 @@ export function VerifyForm() {
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4">
       {email === null ? (
         <>
-          <ChatHeader title="sidequest signup" subtitle="check your email" />
+          <ChatHeader title="sidequest login" subtitle="check your email" />
           <div role="log" className="flex flex-1 flex-col justify-end gap-2 py-8">
             <Bubble from="app">hmm, there&apos;s nothing to verify yet.</Bubble>
             <Bubble from="app">
-              <BoothLink href="/signup">sign up</BoothLink> or <BoothLink href="/login">log in</BoothLink> and
+              <BoothLink href="/login">log in</BoothLink> or <BoothLink href="/signup">sign up</BoothLink> and
               we&apos;ll email you a code.
             </Bubble>
           </div>
         </>
       ) : (
-        <VerifyChat key={version} email={email} next={fromSignup ? "/signup/done" : LOGIN_REDIRECT} />
+        <VerifyChat
+          key={version}
+          email={email}
+          title="sidequest login"
+          subtitle="check your email"
+          // An account whose signup never finished goes back to /signup.
+          next={(onboarded) => (onboarded ? { href: LOGIN_REDIRECT } : { href: "/signup", label: "Finish signing up" })}
+        />
       )}
     </div>
   );
 }
 
-function VerifyChat({ email, next }: { email: string; next: string }) {
+type VerifyChatProps = {
+  email: string;
+  title: string;
+  subtitle: string;
+  // Where to go once verified, given whether the student has a profile yet.
+  next: (onboardingComplete: boolean) => { href: string; label?: string };
+};
+
+// Asks for the emailed code and trades it for the session cookies.
+export function VerifyChat({ email, title, subtitle, next }: VerifyChatProps) {
   const [values, setValues] = useState<ChatValues>({ code: "" });
+  const [onboarded, setOnboarded] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
 
@@ -72,7 +88,8 @@ function VerifyChat({ email, next }: { email: string; next: string }) {
 
   async function verify({ code }: ChatValues) {
     try {
-      await authApi.verify(email, code);
+      const { onboardingComplete } = await authApi.verify(email, code);
+      setOnboarded(onboardingComplete);
     } catch (err) {
       return err instanceof AuthError ? err.message : "something went wrong. please try again.";
     }
@@ -91,8 +108,8 @@ function VerifyChat({ email, next }: { email: string; next: string }) {
 
   return (
     <ChatForm
-      title="sidequest signup"
-      subtitle="check your email"
+      title={title}
+      subtitle={subtitle}
       label="Verify email chat"
       intro={[
         "check your inbox 📬",
@@ -105,7 +122,7 @@ function VerifyChat({ email, next }: { email: string; next: string }) {
       onReset={() => setValues({ code: "" })}
       onComplete={verify}
       closing={["you're verified ✅"]}
-      next={next === "/signup/done" ? { href: next, label: "See my strip" } : { href: next }}
+      next={next(onboarded)}
       footer={
         <div className="flex items-center justify-center gap-3">
           <span aria-live="polite">{notice}</span>

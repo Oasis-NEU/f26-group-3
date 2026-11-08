@@ -26,6 +26,10 @@ export type ChatStep = {
 
 export type ChatValues = Record<string, string>;
 
+// What onComplete returns on failure: a message (re-asks the last question),
+// or a message plus the key of the step to re-ask.
+export type ChatError = string | { message: string; retry: string };
+
 type Message = { id: number; from: "app" | "me"; content: React.ReactNode; tone?: "hint" };
 type Phase = "asking" | "pending" | "done";
 
@@ -39,9 +43,9 @@ type ChatFormProps = {
   onAnswer: (key: string, value: string) => void;
   // Clears this page's answers (the "start over" button).
   onReset: () => void;
-  // Runs after the last answer. Return an error message to re-ask the last
+  // Runs once every step has a valid answer. Return a ChatError to re-ask a
   // question; return nothing on success (or after navigating away).
-  onComplete?: (values: ChatValues) => Promise<string | null | void> | string | null | void;
+  onComplete?: (values: ChatValues) => Promise<ChatError | null | void> | ChatError | null | void;
   closing: string[];
   next: { href: string; label?: string };
   footer?: React.ReactNode;
@@ -137,16 +141,30 @@ export function ChatForm({
     setDraft("");
     setShowPassword(false);
 
-    if (index < steps.length - 1) {
-      const nextStep = steps[index + 1];
-      setChat((c) => ({ ...c, index: index + 1, messages: [...c.messages, msg("me", display(step, value)), ...ask(nextStep)] }));
+    // Next question that still needs an answer. Later ones can already be
+    // answered when onComplete sent us back to fix an earlier one.
+    const answered = { ...values, [step.key]: value };
+    const nextIndex = steps.findIndex(
+      (s, i) => i > index && (!answered[s.key] || s.validate?.(answered[s.key])),
+    );
+    if (nextIndex !== -1) {
+      const nextStep = steps[nextIndex];
+      setChat((c) => ({ ...c, index: nextIndex, messages: [...c.messages, msg("me", display(step, value)), ...ask(nextStep)] }));
       return;
     }
 
     setChat((c) => ({ ...c, phase: "pending", messages: [...c.messages, msg("me", display(step, value))] }));
-    const error = await onComplete?.({ ...values, [step.key]: value });
+    const error = await onComplete?.(answered);
     if (error) {
-      setChat((c) => ({ ...c, phase: "asking", messages: [...c.messages, msg("app", `hmm, ${error}`), ...ask(step, false)] }));
+      const message = typeof error === "string" ? error : error.message;
+      const retry = typeof error === "string" ? -1 : steps.findIndex((s) => s.key === error.retry);
+      const retryIndex = retry === -1 ? index : retry;
+      setChat((c) => ({
+        ...c,
+        phase: "asking",
+        index: retryIndex,
+        messages: [...c.messages, msg("app", `hmm, ${message}`), ...ask(steps[retryIndex], false)],
+      }));
       setDraft("");
       setFocusTick((t) => t + 1);
       return;
