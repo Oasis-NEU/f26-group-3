@@ -8,6 +8,7 @@ import { BoothLink, ChatHeader } from "@/components/chat-booth/chat-header";
 import { PhotoStrip } from "@/components/chat-booth/photo-strip";
 import { focusRing } from "@/components/chat-booth/styles";
 import { SidequestMark } from "@/components/sidequest-mark";
+import { LOGIN_REDIRECT } from "@/lib/config";
 import { clearStrip, getStripJson, parseStrip, subscribeHandoff } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -38,13 +39,13 @@ export function DoneView() {
             <Bubble from="app">see you out there 🗺️</Bubble>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/login"
+                href={LOGIN_REDIRECT}
                 className={cn(
                   "flex-1 rounded-full bg-me px-4 py-3 text-center text-sm font-semibold text-ink hover:opacity-90",
                   focusRing,
                 )}
               >
-                Log in
+                See my quests
               </Link>
               <button
                 type="button"
