@@ -12,19 +12,9 @@ dotenv.config({ path: envPath });
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SECRET_KEY;
 
-// Create the admin client for your backend
+// Admin client for the backend. It bypasses row-level security, so every
+// query must filter to the logged-in student itself.
 export const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Example: Fetch data from a table
-export async function getUsers() {
-  const { data, error } = await supabase.from('users').select('*');
-
-  if (error) {
-    throw new Error(`Error fetching users: ${error.message}`);
-  }
-
-  return data;
-}
 
 // A fresh client for each auth call. Never reuse one shared client for
 // logging users in: it would hold one student's session and could
