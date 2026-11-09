@@ -5,7 +5,7 @@ import { useLayoutEffect, useState } from "react";
 import { BoothLink } from "@/components/chat-booth/chat-header";
 import { ChatForm, type ChatStep, type ChatValues } from "@/components/chat-booth/chat-form";
 import { AuthError, authApi, setPendingEmail } from "@/lib/auth";
-import { LOGIN_REDIRECT } from "@/lib/config";
+import { LOGIN_REDIRECT, safeRedirect } from "@/lib/config";
 import { normalizeEmail, validateIdentifier } from "@/lib/validation";
 
 const steps: ChatStep[] = [
@@ -32,6 +32,8 @@ export function LoginForm() {
   const router = useRouter();
   const [values, setValues] = useState<ChatValues>(EMPTY);
   const [session, setSession] = useState(0);
+  // Logged-in pages send visitors here with ?next=/where-they-were.
+  const [redirectTo, setRedirectTo] = useState(LOGIN_REDIRECT);
 
   // Next keeps left pages mounted but hidden: forget the password and start
   // the chat over whenever the user navigates away.
@@ -45,6 +47,7 @@ export function LoginForm() {
   async function logIn({ identifier, password }: ChatValues) {
     try {
       await authApi.login(identifier, password);
+      setRedirectTo(safeRedirect(new URLSearchParams(window.location.search).get("next")));
     } catch (err) {
       if (err instanceof AuthError && err.code === "UNVERIFIED") {
         const email = err.email ?? (identifier.includes("@") ? normalizeEmail(identifier) : null);
@@ -70,8 +73,8 @@ export function LoginForm() {
         onAnswer={(key, value) => setValues((v) => ({ ...v, [key]: value }))}
         onReset={() => setValues(EMPTY)}
         onComplete={logIn}
-        closing={["you're in! 🎉", "your quests page is still being built, so i'll take you home for now."]}
-        next={{ href: LOGIN_REDIRECT }}
+        closing={["you're in! 🎉"]}
+        next={{ href: redirectTo }}
         footer={
           <>
             new here? <BoothLink href="/signup">sign up</BoothLink>

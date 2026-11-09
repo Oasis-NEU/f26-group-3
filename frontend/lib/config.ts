@@ -15,5 +15,13 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000
 // Only addresses at this domain can sign up.
 export const STUDENT_EMAIL_DOMAIN = "@northeastern.edu";
 
-// Where a successful login lands. Point this at /quests once that page exists.
-export const LOGIN_REDIRECT = "/";
+// Where a successful login lands, unless the login page was given ?next=.
+export const LOGIN_REDIRECT = "/quests";
+
+// Only same-site paths are allowed as ?next=, so a crafted login link can't
+// send the student to another site after they log in.
+export function safeRedirect(next: string | null) {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")
+    ? next
+    : LOGIN_REDIRECT;
+}

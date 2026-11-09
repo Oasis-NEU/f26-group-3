@@ -1,7 +1,8 @@
 // The one module that talks to the auth API. In demo mode (lib/config.ts)
 // the same functions return fake responses so the flow works without a backend.
 
-import { API_URL, DEMO_DELAY_MS, DEMO_MODE } from "@/lib/config";
+import { ApiError, request } from "@/lib/api";
+import { DEMO_DELAY_MS, DEMO_MODE } from "@/lib/config";
 import { CODE_LENGTH, normalizeEmail, normalizeUsername } from "@/lib/validation";
 
 export const RESEND_COOLDOWN_SECONDS = 60;
@@ -20,46 +21,21 @@ export type SignupPayload = {
 
 export type LoginResult = { onboardingComplete: boolean };
 
-export class AuthError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code?: string,
-    public email?: string,
-  ) {
-    super(message);
-  }
-}
+// Auth failures are ordinary API errors; the alias keeps existing imports working.
+export { ApiError as AuthError } from "@/lib/api";
 
 // Expected backend contract (POST, JSON, cookies for the session):
 //   /api/auth/signup  SignupPayload             -> 201 {}            (emails a code)
 //   /api/auth/verify  { email, code }           -> 200 {}            (sets session cookie)
 //   /api/auth/resend  { email }                 -> 200 {}
 //   /api/auth/login   { identifier, password }  -> 200 LoginResult   (sets session cookie)
+//   /api/auth/logout  {}                        -> 200 {}            (clears session cookie)
 // `identifier` is a username or a student email.
 // Errors: { error: string, code?: string } with a 4xx/5xx status, e.g.
 //   409 { code: "USERNAME_TAKEN" } from signup,
 //   403 { code: "UNVERIFIED", email } from login.
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/api/auth${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new AuthError("can't reach sidequest right now. try again in a moment.", 0);
-  }
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new AuthError(data.error ?? "something went wrong. please try again.", res.status, data.code, data.email);
-  }
-  return data as T;
-}
+const post = <T>(path: string, body: unknown) => request<T>("POST", `/auth${path}`, body);
 
 // --- demo mode -------------------------------------------------------------
 // Error triggers: username "taken" (signup), password "wrongpass" (login),
@@ -70,13 +46,13 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, DEMO_DELAY_MS));
 async function demo<T>(path: string, body: Record<string, unknown>): Promise<T> {
   await wait();
   if (path === "/signup" && body.username === "taken") {
-    throw new AuthError("that username is already taken.", 409, "USERNAME_TAKEN");
+    throw new ApiError("that username is already taken.", 409, "USERNAME_TAKEN");
   }
   if (path === "/login" && body.password === "wrongpass") {
-    throw new AuthError("that password doesn't match. try again?", 401, "INVALID_CREDENTIALS");
+    throw new ApiError("that password doesn't match. try again?", 401, "INVALID_CREDENTIALS");
   }
   if (path === "/verify" && body.code === "0".repeat(CODE_LENGTH)) {
-    throw new AuthError("that code didn't work. check your email and try again.", 400, "INVALID_CODE");
+    throw new ApiError("that code didn't work. check your email and try again.", 400, "INVALID_CODE");
   }
   return (path === "/login" ? { onboardingComplete: true } : {}) as T;
 }
@@ -103,6 +79,7 @@ export const authApi = {
   resend: (email: string) => call<object>("/resend", { email: normalizeEmail(email) }),
   login: (identifier: string, password: string) =>
     call<LoginResult>("/login", { identifier: normalizeIdentifier(identifier), password }),
+  logout: () => call<object>("/logout", {}),
 };
 
 // --- hand-off between pages --------------------------------------------------
