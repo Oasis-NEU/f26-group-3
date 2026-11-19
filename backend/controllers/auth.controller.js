@@ -3,14 +3,14 @@ import {
   setAuthCookies, clearAuthCookies, ACCESS_COOKIE, REFRESH_COOKIE,
 } from '../utils/authCookies.js';
 import { normalizeEmail, normalizeUsername, isStudentEmail, isUsername, isCode } from '../utils/signupRules.js';
-import { getProfile, isUsernameTaken, isEmailRegistered } from '../repositories/profiles.repository.js';
+import { getProfile, isUsernameTaken } from '../repositories/profiles.repository.js';
 
 // Sign-in is passwordless: Supabase emails a 6-digit code (the {{ .Token }}
 // in the email templates) and /verify trades it for a session.
 //
 //   POST /api/auth/signup  { username, email }  -> 201
-//   POST /api/auth/login   { email }            -> 200
-//   POST /api/auth/resend  { email }            -> 200
+//   POST /api/auth/login   { email }            -> 200  (same answer whether or not the account exists)
+//   POST /api/auth/resend  { email }            -> 200  (same)
 //   POST /api/auth/verify  { email, code }      -> 200 { user, onboardingComplete }  (sets cookies)
 //   POST /api/auth/logout                       -> 200
 //
@@ -21,10 +21,15 @@ import { getProfile, isUsernameTaken, isEmailRegistered } from '../repositories/
 const badEmail = (res) =>
   res.status(400).json({ error: 'that needs to be a @northeastern.edu address.', code: 'INVALID_EMAIL' });
 
+// Supabase's answer when shouldCreateUser is false and the email has no account.
+const isNoAccount = (error) => error.code === 'otp_disabled' || /signups not allowed/i.test(error.message);
+
 // Asks Supabase to email a code. Returns the response to send if it failed.
+// With shouldCreateUser false, an unknown email counts as success, so login
+// and resend can't be used to probe which students have accounts.
 async function emailCode(res, email, shouldCreateUser) {
   const { error } = await createAuthClient().auth.signInWithOtp({ email, options: { shouldCreateUser } });
-  if (!error) return null;
+  if (!error || (!shouldCreateUser && isNoAccount(error))) return null;
 
   if (error.status === 429) {
     return res.status(429).json({ error: 'please wait a minute before asking for another code.', code: 'RATE_LIMITED' });
@@ -43,9 +48,8 @@ export async function signup(req, res, next) {
   }
 
   try {
-    if (await isEmailRegistered(email)) {
-      return res.status(409).json({ error: 'you already have an account. log in instead.', code: 'EMAIL_TAKEN' });
-    }
+    // No "email taken" error: an existing student just gets a login code, and
+    // /verify reports onboardingComplete so the frontend sends them home.
     if (await isUsernameTaken(username)) {
       return res.status(409).json({ error: 'that username is already taken.', code: 'USERNAME_TAKEN' });
     }
@@ -63,9 +67,6 @@ export async function login(req, res, next) {
   if (!isStudentEmail(email)) return badEmail(res);
 
   try {
-    if (!(await isEmailRegistered(email))) {
-      return res.status(404).json({ error: "there's no account with that email yet.", code: 'NO_ACCOUNT' });
-    }
     if (await emailCode(res, email, false)) return;
     res.json({});
   } catch (err) {
@@ -79,7 +80,7 @@ export async function resend(req, res, next) {
   if (!isStudentEmail(email)) return badEmail(res);
 
   try {
-    // shouldCreateUser: false, so this can't create accounts. signup/login already did.
+    // shouldCreateUser: false, so this can't create accounts. signup already did.
     if (await emailCode(res, email, false)) return;
     res.json({});
   } catch (err) {

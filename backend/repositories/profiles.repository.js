@@ -10,6 +10,8 @@ const INFO_COLUMNS = 'first_name, academic_year, gender, major, campus, interest
 
 // Thrown by createProfile when the username was taken after signup checked it.
 export class UsernameTakenError extends Error {}
+// Thrown by createProfile when this student already has a profile (e.g. a double submit).
+export class AlreadyOnboardedError extends Error {}
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -17,17 +19,15 @@ function check(error, action) {
   if (error) throw new Error(`Failed to ${action}: ${error.message}`);
 }
 
-async function exists(column, value) {
-  const { count, error } = await supabase
-    .from('users')
-    .select('user_id', { count: 'exact', head: true })
-    .eq(column, value);
-  check(error, `look up ${column}`);
+// exceptUserId skips the student's own users row, which can be left over
+// from a signup that failed halfway.
+export async function isUsernameTaken(username, exceptUserId) {
+  let query = supabase.from('users').select('user_id', { count: 'exact', head: true }).eq('username', username);
+  if (exceptUserId) query = query.neq('user_id', exceptUserId);
+  const { count, error } = await query;
+  check(error, 'look up username');
   return count > 0;
 }
-
-export const isUsernameTaken = (username) => exists('username', username);
-export const isEmailRegistered = (email) => exists('northeastern_email', email);
 
 // Returns the student's Profile, or null if they haven't finished signing up.
 export async function getProfile(userId) {
@@ -43,12 +43,13 @@ export async function getProfile(userId) {
 }
 
 // Creates both rows for a new student. Meant for the signup handler, after
-// validateNewProfile(). If the second insert fails, the first is undone so a
-// retry starts clean.
+// validateNewProfile(). The users row is upserted so a student whose earlier
+// attempt left only that row can finish. If the second insert fails, the
+// first is undone so a retry starts clean.
 export async function createProfile(userId, { username, email, ...fields }) {
   const { error: userError } = await supabase
     .from('users')
-    .insert({ user_id: userId, username, northeastern_email: email });
+    .upsert({ user_id: userId, username, northeastern_email: email }, { onConflict: 'user_id' });
   // Only a unique index on users.username makes this reliable; signup also checks first.
   if (userError?.code === UNIQUE_VIOLATION && /username/.test(userError.message)) throw new UsernameTakenError();
   check(userError, 'create user');
@@ -56,6 +57,8 @@ export async function createProfile(userId, { username, email, ...fields }) {
   const { error: infoError } = await supabase
     .from('user_information')
     .insert({ user_id: userId, ...toInfoRow(fields) });
+  // Another request finished first; its users row is the real one, so keep it.
+  if (infoError?.code === UNIQUE_VIOLATION) throw new AlreadyOnboardedError();
   if (infoError) {
     await supabase.from('users').delete().eq('user_id', userId);
     check(infoError, 'create profile');

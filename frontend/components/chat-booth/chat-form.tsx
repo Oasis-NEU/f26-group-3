@@ -1,20 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { EyeIcon, EyeOffIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Bubble, TypingBubble } from "@/components/chat-booth/bubble";
 import { ChatColumn, KeepGoingLink, MessageBar, SendButton } from "@/components/chat-booth/chat-column";
 import { ChatHeader } from "@/components/chat-booth/chat-header";
 import { Chip } from "@/components/chat-booth/chip";
-import { focusRing } from "@/components/chat-booth/styles";
 
 export type ChatStep = {
   key: string;
   question: string;
   // Quieter app bubble under the question the first time it's asked.
   hint?: string;
-  kind: "text" | "email" | "password" | "chips";
+  kind: "text" | "email" | "chips";
   options?: string[];
   placeholder?: string;
   autoComplete?: string;
@@ -59,9 +56,6 @@ const msg = (from: Message["from"], content: React.ReactNode, tone?: Message["to
   tone,
 });
 
-const display = (step: ChatStep, value: string) =>
-  step.kind === "password" ? "•".repeat(Math.min(Math.max(value.length, 6), 12)) : value;
-
 const ask = (step: ChatStep, withHint = true) => [
   msg("app", step.question),
   ...(withHint && step.hint ? [msg("app", step.hint, "hint")] : []),
@@ -75,14 +69,15 @@ function replay(steps: ChatStep[], values: ChatValues, intro: string[], closing:
     const step = steps[i];
     const value = values[step.key] ?? "";
     if (!value || step.validate?.(value)) {
-      return { messages: [...messages, ...ask(step)], index: i, phase: "asking" as Phase };
+      return { messages: [...messages, ...ask(step)], index: i, phase: "asking" as Phase, retrying: false };
     }
-    messages.push(msg("app", step.question), msg("me", display(step, value)));
+    messages.push(msg("app", step.question), msg("me", value));
   }
   return {
     messages: [...messages, ...closing.map((text) => msg("app", text))],
     index: steps.length - 1,
     phase: "done" as Phase,
+    retrying: false,
   };
 }
 
@@ -102,13 +97,14 @@ export function ChatForm({
 }: ChatFormProps) {
   const [chat, setChat] = useState(() => replay(steps, values, intro, closing));
   const [draft, setDraft] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [focusTick, setFocusTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const chipsRef = useRef<HTMLDivElement>(null);
   const keepGoingRef = useRef<HTMLAnchorElement>(null);
 
-  const { messages, index, phase } = chat;
+  // retrying: onComplete sent us back to fix one answer, so later answers
+  // (already shown and still valid) are kept instead of asked again.
+  const { messages, index, phase, retrying } = chat;
   const step = steps[index];
   const showChips = phase === "asking" && step.kind === "chips";
 
@@ -125,12 +121,12 @@ export function ChatForm({
 
   async function answer(raw: string) {
     if (phase !== "asking") return;
-    const value = step.kind === "password" ? raw : raw.trim();
+    const value = raw.trim();
     const problem = step.validate ? step.validate(value) : value ? null : "i didn't catch that.";
 
     if (problem) {
       // Show the attempt, explain, ask again.
-      say(...(value ? [msg("me", display(step, value))] : []), msg("app", `hmm, ${problem}`), ...ask(step, false));
+      say(...(value ? [msg("me", value)] : []), msg("app", `hmm, ${problem}`), ...ask(step, false));
       // The attempt is in the transcript now, so the bar starts empty.
       setDraft("");
       setFocusTick((t) => t + 1);
@@ -139,21 +135,20 @@ export function ChatForm({
 
     onAnswer(step.key, value);
     setDraft("");
-    setShowPassword(false);
 
-    // Next question that still needs an answer. Later ones can already be
-    // answered when onComplete sent us back to fix an earlier one.
     const answered = { ...values, [step.key]: value };
-    const nextIndex = steps.findIndex(
-      (s, i) => i > index && (!answered[s.key] || s.validate?.(answered[s.key])),
-    );
+    const nextIndex = retrying
+      ? steps.findIndex((s, i) => i > index && (!answered[s.key] || s.validate?.(answered[s.key])))
+      : index + 1 < steps.length
+        ? index + 1
+        : -1;
     if (nextIndex !== -1) {
       const nextStep = steps[nextIndex];
-      setChat((c) => ({ ...c, index: nextIndex, messages: [...c.messages, msg("me", display(step, value)), ...ask(nextStep)] }));
+      setChat((c) => ({ ...c, index: nextIndex, messages: [...c.messages, msg("me", value), ...ask(nextStep)] }));
       return;
     }
 
-    setChat((c) => ({ ...c, phase: "pending", messages: [...c.messages, msg("me", display(step, value))] }));
+    setChat((c) => ({ ...c, phase: "pending", retrying: false, messages: [...c.messages, msg("me", value)] }));
     const error = await onComplete?.(answered);
     if (error) {
       const message = typeof error === "string" ? error : error.message;
@@ -163,6 +158,7 @@ export function ChatForm({
         ...c,
         phase: "asking",
         index: retryIndex,
+        retrying: true,
         messages: [...c.messages, msg("app", `hmm, ${message}`), ...ask(steps[retryIndex], false)],
       }));
       setDraft("");
@@ -175,7 +171,6 @@ export function ChatForm({
   function startOver() {
     onReset();
     setDraft("");
-    setShowPassword(false);
     setChat(replay(steps, {}, intro, closing));
     setFocusTick((t) => t + 1);
   }
@@ -210,9 +205,7 @@ export function ChatForm({
           ref={inputRef}
           id={inputId}
           name={step.key}
-          type={
-            step.kind === "password" ? (showPassword ? "text" : "password") : step.kind === "email" ? "email" : "text"
-          }
+          type={step.kind === "email" ? "email" : "text"}
           autoComplete={step.autoComplete}
           inputMode={step.inputMode}
           maxLength={step.maxLength}
@@ -226,17 +219,6 @@ export function ChatForm({
           readOnly={phase === "pending"}
           className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-soft disabled:cursor-not-allowed"
         />
-        {step.kind === "password" && (
-          <button
-            type="button"
-            onClick={() => setShowPassword((s) => !s)}
-            aria-pressed={showPassword}
-            aria-label="Show password"
-            className={cn("rounded-full p-1.5 text-soft hover:text-ink", focusRing, "focus-visible:ring-offset-white")}
-          >
-            {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
-          </button>
-        )}
         {/* aria-disabled (not disabled) while sending, so focus stays put. */}
         <SendButton disabled={showChips} aria-disabled={phase === "pending" || undefined}>
           Send

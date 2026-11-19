@@ -44,7 +44,6 @@ export function LoginForm() {
     try {
       await authApi.login(email);
     } catch (err) {
-      if (err instanceof AuthError && err.code === "NO_ACCOUNT") return `${err.message} sign up below?`;
       return err instanceof AuthError ? err.message : "something went wrong. please try again.";
     }
     const next = new URLSearchParams(window.location.search).get("next");
@@ -67,7 +66,8 @@ export function LoginForm() {
         onAnswer={(key, value) => setValues((v) => ({ ...v, [key]: value }))}
         onReset={() => setValues(EMPTY)}
         onComplete={sendCode}
-        closing={["code sent! 📬"]}
+        // The backend answers the same for unknown emails, so don't promise a code.
+        closing={["if that email has an account, a code is on its way 📬"]}
         next={{ href: verifyHref }}
         footer={
           <>

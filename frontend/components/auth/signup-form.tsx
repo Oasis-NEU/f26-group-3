@@ -35,14 +35,14 @@ export function SignupForm() {
   const router = useRouter();
   const { data, update } = useSignup();
 
-  // Checks the username and email are free, then emails the code right away.
+  // Checks the username is free, then emails the code right away. An email
+  // that already has an account gets a login code instead (see SignupVerify).
   async function sendCode({ username, email }: ChatValues): Promise<ChatError | void> {
     try {
       await authApi.signup(username, email);
     } catch (err) {
       if (!(err instanceof AuthError)) return "something went wrong. please try again.";
       if (err.code === "USERNAME_TAKEN") return { message: `${err.message} try another?`, retry: "username" };
-      if (err.code === "EMAIL_TAKEN") return `${err.message} (link below)`;
       return err.message;
     }
     router.push("/signup/verify");

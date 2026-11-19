@@ -4,8 +4,9 @@
 
 const USERNAME = /^[a-z0-9._]{3,20}$/;
 const NEU_EMAIL = /^[a-z0-9._%+-]+@northeastern\.edu$/;
-// Supabase codes are 6-10 digits ("Email OTP Length" in the dashboard).
-const CODE = /^\d{6,10}$/;
+// 6 digits: must match "Email OTP Length" in the Supabase dashboard and
+// CODE_LENGTH in frontend/lib/validation.ts.
+const CODE = /^\d{6}$/;
 
 const str = (value) => (typeof value === 'string' ? value.trim() : '');
 

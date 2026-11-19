@@ -93,6 +93,12 @@ export function InterestsForm() {
             hmm, your session ran out. <BoothLink href="/signup">start again from step 1</BoothLink>.
           </>,
         );
+      } else if (err instanceof AuthError && err.code === "WRONG_ACCOUNT") {
+        note(
+          <>
+            hmm, {err.message} <BoothLink href="/signup">go back to step 1</BoothLink> to verify {data.email}.
+          </>,
+        );
       } else if (err instanceof AuthError && err.code === "ALREADY_ONBOARDED") {
         note(
           <>

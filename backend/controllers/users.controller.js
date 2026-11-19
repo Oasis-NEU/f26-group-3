@@ -1,8 +1,8 @@
 import {
-  getProfile, updateProfile, createProfile, isUsernameTaken, UsernameTakenError,
+  getProfile, updateProfile, createProfile, isUsernameTaken, UsernameTakenError, AlreadyOnboardedError,
 } from '../repositories/profiles.repository.js';
 import { validateNewProfile, validateProfileUpdate } from '../validation/profile.js';
-import { normalizeUsername, isUsername } from '../utils/signupRules.js';
+import { normalizeEmail, normalizeUsername, isUsername } from '../utils/signupRules.js';
 
 const account = (user) => ({ id: user.id, email: user.email });
 
@@ -12,11 +12,21 @@ export async function getMe(req, res) {
   res.json({ user: account(req.user), profile });
 }
 
-// POST /api/users/me/profile  body: { username, firstName, gender, year, major, campus, interests }
+// POST /api/users/me/profile  body: { email, username, firstName, gender, year, major, campus, interests }
 // The last step of signup, after the student verified their email code.
-// The email comes from the session, never the body.
+// The saved email comes from the session. The body's email is only checked
+// against it, so a leftover session (shared computer, or a student who
+// switched emails mid-signup) can't receive someone else's profile.
+const alreadyOnboarded = (res) =>
+  res.status(409).json({ error: "you've already finished signing up.", code: 'ALREADY_ONBOARDED' });
+const usernameTaken = (res) =>
+  res.status(409).json({ error: 'someone just took that username.', code: 'USERNAME_TAKEN' });
+
 export async function createMe(req, res) {
-  const { username: rawUsername, ...fields } = req.body ?? {};
+  const { email, username: rawUsername, ...fields } = req.body ?? {};
+  if (normalizeEmail(email) !== normalizeEmail(req.user.email)) {
+    return res.status(403).json({ error: "you're logged in with a different email.", code: 'WRONG_ACCOUNT' });
+  }
   const username = normalizeUsername(rawUsername);
   if (!isUsername(username)) {
     return res.status(400).json({ error: 'usernames are 3–20 letters, numbers, dots or underscores.', field: 'username' });
@@ -24,20 +34,15 @@ export async function createMe(req, res) {
   const { value, error, field } = validateNewProfile(fields);
   if (error) return res.status(400).json({ error, field });
 
-  if (await getProfile(req.user.id)) {
-    return res.status(409).json({ error: "you've already finished signing up.", code: 'ALREADY_ONBOARDED' });
-  }
-  if (await isUsernameTaken(username)) {
-    return res.status(409).json({ error: 'someone just took that username.', code: 'USERNAME_TAKEN' });
-  }
+  if (await getProfile(req.user.id)) return alreadyOnboarded(res);
+  if (await isUsernameTaken(username, req.user.id)) return usernameTaken(res);
 
   try {
     const profile = await createProfile(req.user.id, { username, email: req.user.email, ...value });
     res.status(201).json({ user: account(req.user), profile });
   } catch (err) {
-    if (err instanceof UsernameTakenError) {
-      return res.status(409).json({ error: 'someone just took that username.', code: 'USERNAME_TAKEN' });
-    }
+    if (err instanceof UsernameTakenError) return usernameTaken(res);
+    if (err instanceof AlreadyOnboardedError) return alreadyOnboarded(res);
     throw err;
   }
 }

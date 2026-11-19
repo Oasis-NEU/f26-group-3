@@ -11,8 +11,8 @@ export { ApiError as AuthError } from "@/lib/api";
 
 export const RESEND_COOLDOWN_SECONDS = 60;
 
-// Everything the signup chat collects. `email` is only used to send the code;
-// the backend takes the email from the session when saving the profile.
+// Everything the signup chat collects. When saving the profile, `email` is
+// only checked against the session's; the backend saves the session's.
 export type SignupPayload = {
   username: string;
   email: string;
@@ -30,18 +30,19 @@ export type VerifyResult = { user: { id: string; email: string }; onboardingComp
 // sends automatically, so this code never sees a token). Sign-in is
 // passwordless: routes that email something send a one-time code.
 //   POST /api/auth/signup       { username, email }  -> 201 {}             (emails a code)
-//   POST /api/auth/login        { email }            -> 200 {}             (emails a code)
+//   POST /api/auth/login        { email }            -> 200 {}             (emails a code if the account exists)
 //   POST /api/auth/resend       { email }            -> 200 {}
 //   POST /api/auth/verify       { email, code }      -> 200 VerifyResult   (sets session cookies)
 //   POST /api/auth/logout       {}                   -> 200                (clears them)
 //   POST /api/users/me/profile  profile answers      -> 201                (needs the session)
 // Errors: { error: string, code?: string } with a 4xx/5xx status, e.g.
-//   409 { code: "USERNAME_TAKEN" | "EMAIL_TAKEN" } from signup,
-//   404 { code: "NO_ACCOUNT" } from login.
+//   409 { code: "USERNAME_TAKEN" } from signup,
+//   403 { code: "WRONG_ACCOUNT" } from saving a profile while logged in as another email.
+// Signup and login never say whether an email has an account.
 
 // --- demo mode -------------------------------------------------------------
-// Error triggers: username "taken" (signup), email "nobody@northeastern.edu"
-// (login), code "000000" (verify). Demo mode is always "logged in".
+// Error triggers: username "taken" (signup), code "000000" (verify).
+// Demo mode is always "logged in".
 
 const wait = () => new Promise((resolve) => setTimeout(resolve, DEMO_DELAY_MS));
 
@@ -49,9 +50,6 @@ async function demo<T>(path: string, body: Record<string, unknown>): Promise<T> 
   await wait();
   if (path === "/auth/signup" && body.username === "taken") {
     throw new ApiError("that username is already taken.", 409, "USERNAME_TAKEN");
-  }
-  if (path === "/auth/login" && body.email === "nobody@northeastern.edu") {
-    throw new ApiError("there's no account with that email yet.", 404, "NO_ACCOUNT");
   }
   if (path === "/auth/verify" && body.code === "0".repeat(CODE_LENGTH)) {
     throw new ApiError("that code didn't work. check your email and try again.", 400, "INVALID_CODE");
@@ -74,10 +72,11 @@ export const authApi = {
   resend: (email: string) => post<object>("/auth/resend", { email: normalizeEmail(email) }),
   logout: () => post<object>("/auth/logout", {}),
 
-  // Last step of signup; needs the session from verify.
-  // The email isn't sent: the backend takes it from the session.
+  // Last step of signup; needs the session from verify. The backend rejects
+  // it if the session belongs to a different email.
   saveProfile: (data: SignupPayload) =>
     post<object>("/users/me/profile", {
+      email: normalizeEmail(data.email),
       username: normalizeUsername(data.username),
       firstName: data.firstName.trim(),
       gender: data.gender,

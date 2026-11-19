@@ -7,7 +7,10 @@ import { STUDENT_EMAIL_DOMAIN } from "@/lib/config";
 export const USERNAME_PATTERN = /^[a-z0-9._]{3,20}$/i;
 export const FIRST_NAME_MAX = 40;
 export const MAJOR_MAX = 60;
+// Must match "Email OTP Length" in the Supabase dashboard.
 export const CODE_LENGTH = 6;
+// Same as NEU_EMAIL in backend/utils/signupRules.js (input is lowercased first).
+const STUDENT_EMAIL = /^[a-z0-9._%+-]+@northeastern\.edu$/;
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -27,9 +30,7 @@ export function validateUsername(value: string) {
 export function validateEmail(value: string) {
   const email = normalizeEmail(value);
   if (!email) return "you'll need your student email.";
-  const [local, domain, extra] = email.split("@");
-  const ok = local && domain !== undefined && extra === undefined && `@${domain}` === STUDENT_EMAIL_DOMAIN;
-  return ok ? null : `that needs to be a ${STUDENT_EMAIL_DOMAIN} address.`;
+  return STUDENT_EMAIL.test(email) ? null : `that needs to be a ${STUDENT_EMAIL_DOMAIN} address.`;
 }
 
 export function validateFirstName(value: string) {

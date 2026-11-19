@@ -4,6 +4,7 @@ import { Bubble } from "@/components/chat-booth/bubble";
 import { BoothLink, ChatHeader } from "@/components/chat-booth/chat-header";
 import { useSignup } from "@/components/auth/signup-context";
 import { VerifyChat } from "@/components/auth/verify-form";
+import { LOGIN_REDIRECT } from "@/lib/config";
 import { validateEmail } from "@/lib/validation";
 
 // /signup/verify: the code step right after the student gives their email.
@@ -28,7 +29,8 @@ export function SignupVerify() {
           email={data.email}
           title="sidequest signup"
           subtitle="step 1 of 3 · check your email"
-          next={() => ({ href: "/signup/details" })}
+          // Signing up with an email that already has an account logs them in.
+          next={(onboarded) => (onboarded ? { href: LOGIN_REDIRECT, label: "You already have an account. Go home" } : { href: "/signup/details" })}
         />
       )}
     </div>
