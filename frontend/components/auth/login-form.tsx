@@ -27,6 +27,9 @@ export function LoginForm() {
   const router = useRouter();
   const [values, setValues] = useState<ChatValues>(EMPTY);
   const [session, setSession] = useState(0);
+  // Logged-in pages send visitors here with ?next=/where-they-were;
+  // /verify passes it on once the code checks out.
+  const [verifyHref, setVerifyHref] = useState("/verify");
 
   // Next keeps left pages mounted but hidden: start the chat over whenever
   // the user navigates away.
@@ -44,9 +47,12 @@ export function LoginForm() {
       if (err instanceof AuthError && err.code === "NO_ACCOUNT") return `${err.message} sign up below?`;
       return err instanceof AuthError ? err.message : "something went wrong. please try again.";
     }
-    clearStrip(); // a leftover strip would make /verify think this is a signup
+    const next = new URLSearchParams(window.location.search).get("next");
+    const href = next ? `/verify?next=${encodeURIComponent(next)}` : "/verify";
+    setVerifyHref(href);
+    clearStrip(); // a leftover strip from an earlier signup isn't this student's
     setPendingEmail(email);
-    router.push("/verify");
+    router.push(href);
   }
 
   return (
@@ -62,7 +68,7 @@ export function LoginForm() {
         onReset={() => setValues(EMPTY)}
         onComplete={sendCode}
         closing={["code sent! 📬"]}
-        next={{ href: "/verify" }}
+        next={{ href: verifyHref }}
         footer={
           <>
             new here? <BoothLink href="/signup">sign up</BoothLink>

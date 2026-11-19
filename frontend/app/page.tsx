@@ -1,19 +1,10 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { focusRing } from "@/components/chat-booth/styles";
-import { SidequestMark } from "@/components/sidequest-mark";
+import { primaryButton, secondaryButton } from "@/components/chat-booth/styles";
+import { HeaderLink, SiteHeader } from "@/components/site-header";
 import { Bubble } from "@/components/chat-booth/bubble";
 import { PhotoStrip } from "@/components/chat-booth/photo-strip";
 import { INTERESTS, MAX_INTERESTS } from "@/lib/signup-options";
-
-const primaryCta = cn(
-  "inline-flex items-center justify-center rounded-full bg-me px-5 py-3 text-sm font-semibold text-ink transition-opacity hover:opacity-90",
-  focusRing,
-);
-const secondaryCta = cn(
-  "inline-flex items-center justify-center rounded-full border-[1.5px] border-ink/25 px-5 py-3 text-sm font-semibold text-ink hover:border-ink",
-  focusRing,
-);
 
 const STEPS = [
   {
@@ -62,22 +53,12 @@ function ImagePlaceholder({ label, className }: { label: string; className?: str
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col bg-page font-sans text-ink">
-      <header className="sticky top-0 z-10 border-b border-ink/10 bg-page/95 backdrop-blur-sm">
-        <nav aria-label="Main" className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-          <Link href="/" className={cn("flex items-center gap-2 rounded-md", focusRing)}>
-            <SidequestMark className="h-8 w-9" />
-            <span className="text-lg font-bold">sidequest</span>
-          </Link>
-          <div className="ml-auto flex items-center gap-2">
-            <Link href="/login" className={cn("rounded-full px-3 py-2 text-sm font-semibold hover:bg-ink/5", focusRing)}>
-              log in
-            </Link>
-            <Link href="/signup" className={cn(primaryCta, "px-4 py-2")}>
-              sign up
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <SiteHeader>
+        <HeaderLink href="/login">log in</HeaderLink>
+        <Link href="/signup" className={cn(primaryButton, "px-4 py-2")}>
+          sign up
+        </Link>
+      </SiteHeader>
 
       <main className="flex-1">
         {/* Hero */}
@@ -92,10 +73,10 @@ export default function Home() {
               study groups.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/signup" className={primaryCta}>
+              <Link href="/signup" className={primaryButton}>
                 start your sidequest →
               </Link>
-              <Link href="/login" className={secondaryCta}>
+              <Link href="/login" className={secondaryButton}>
                 i have an account
               </Link>
             </div>
@@ -182,7 +163,7 @@ export default function Home() {
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-3xl bg-ink px-6 py-12 text-center text-white">
             <h2 className="text-2xl font-bold md:text-3xl">your next sidequest is waiting.</h2>
             <p className="max-w-md text-sm text-white/75">it takes about two minutes to make your strip.</p>
-            <Link href="/signup" className={cn(primaryCta, "focus-visible:ring-white focus-visible:ring-offset-ink")}>
+            <Link href="/signup" className={cn(primaryButton, "focus-visible:ring-white focus-visible:ring-offset-ink")}>
               sign up free →
             </Link>
           </div>

@@ -13,7 +13,7 @@ import {
   getPendingEmail,
   subscribeHandoff,
 } from "@/lib/auth";
-import { DEMO_MODE, LOGIN_REDIRECT } from "@/lib/config";
+import { DEMO_MODE, safeRedirect } from "@/lib/config";
 import { CODE_LENGTH, validateCode } from "@/lib/validation";
 
 const steps: ChatStep[] = [
@@ -37,6 +37,8 @@ export function VerifyForm() {
   const version = useSyncExternalStore(subscribeHandoff, getHandoffVersion, () => 0);
 
   if (email === undefined) return null;
+  // Safe to read here: only reached in the browser. safeRedirect keeps it on this site.
+  const redirectTo = safeRedirect(new URLSearchParams(window.location.search).get("next"));
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4">
@@ -58,7 +60,7 @@ export function VerifyForm() {
           title="sidequest login"
           subtitle="check your email"
           // An account whose signup never finished goes back to /signup.
-          next={(onboarded) => (onboarded ? { href: LOGIN_REDIRECT } : { href: "/signup", label: "Finish signing up" })}
+          next={(onboarded) => (onboarded ? { href: redirectTo } : { href: "/signup", label: "Finish signing up" })}
         />
       )}
     </div>

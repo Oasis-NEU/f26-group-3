@@ -3,7 +3,7 @@ import {
   setAuthCookies, clearAuthCookies, ACCESS_COOKIE, REFRESH_COOKIE,
 } from '../utils/authCookies.js';
 import { normalizeEmail, normalizeUsername, isStudentEmail, isUsername, isCode } from '../utils/signupRules.js';
-import { findUserById, isUsernameTaken, isEmailRegistered } from '../repositories/users.repository.js';
+import { getProfile, isUsernameTaken, isEmailRegistered } from '../repositories/profiles.repository.js';
 
 // Sign-in is passwordless: Supabase emails a 6-digit code (the {{ .Token }}
 // in the email templates) and /verify trades it for a session.
@@ -105,7 +105,7 @@ export async function verify(req, res, next) {
 
     setAuthCookies(res, data.session);
     const { user } = data;
-    const onboardingComplete = Boolean(await findUserById(user.id));
+    const onboardingComplete = Boolean(await getProfile(user.id));
     res.json({ user: { id: user.id, email: user.email }, onboardingComplete });
   } catch (err) {
     next(err);

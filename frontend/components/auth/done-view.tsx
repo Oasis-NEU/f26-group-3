@@ -47,7 +47,7 @@ export function DoneView() {
                   focusRing,
                 )}
               >
-                Let’s go
+                See my quests
               </Link>
               <button
                 type="button"

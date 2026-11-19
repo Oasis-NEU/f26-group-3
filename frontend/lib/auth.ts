@@ -1,8 +1,13 @@
 // The one module that talks to the auth API. In demo mode (lib/config.ts)
 // the same functions return fake responses so the flow works without a backend.
+// The logged-in student's profile lives in lib/profile.ts.
 
-import { API_URL, DEMO_DELAY_MS, DEMO_MODE } from "@/lib/config";
+import { ApiError, request } from "@/lib/api";
+import { DEMO_DELAY_MS, DEMO_MODE } from "@/lib/config";
 import { CODE_LENGTH, normalizeEmail, normalizeUsername } from "@/lib/validation";
+
+// Auth failures are ordinary API errors; the alias keeps existing imports working.
+export { ApiError as AuthError } from "@/lib/api";
 
 export const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -19,19 +24,7 @@ export type SignupPayload = {
   interests: string[];
 };
 
-export type SessionUser = { id: string; email: string };
-export type VerifyResult = { user: SessionUser; onboardingComplete: boolean };
-export type Me = { user: SessionUser & { username: string | null }; onboardingComplete: boolean };
-
-export class AuthError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code?: string,
-  ) {
-    super(message);
-  }
-}
+export type VerifyResult = { user: { id: string; email: string }; onboardingComplete: boolean };
 
 // Backend contract (JSON; the session lives in HTTP-only cookies the browser
 // sends automatically, so this code never sees a token). Sign-in is
@@ -41,31 +34,10 @@ export class AuthError extends Error {
 //   POST /api/auth/resend       { email }            -> 200 {}
 //   POST /api/auth/verify       { email, code }      -> 200 VerifyResult   (sets session cookies)
 //   POST /api/auth/logout       {}                   -> 200                (clears them)
-//   GET  /api/users/me                               -> 200 Me, or 401 when logged out
 //   POST /api/users/me/profile  profile answers      -> 201                (needs the session)
 // Errors: { error: string, code?: string } with a 4xx/5xx status, e.g.
 //   409 { code: "USERNAME_TAKEN" | "EMAIL_TAKEN" } from signup,
 //   404 { code: "NO_ACCOUNT" } from login.
-
-async function request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/api${path}`, {
-      method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      credentials: "include", // send and receive the session cookies
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch {
-    throw new AuthError("can't reach sidequest right now. try again in a moment.", 0);
-  }
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new AuthError(data.error ?? "something went wrong. please try again.", res.status, data.code);
-  }
-  return data as T;
-}
 
 // --- demo mode -------------------------------------------------------------
 // Error triggers: username "taken" (signup), email "nobody@northeastern.edu"
@@ -73,26 +45,23 @@ async function request<T>(method: "GET" | "POST", path: string, body?: unknown):
 
 const wait = () => new Promise((resolve) => setTimeout(resolve, DEMO_DELAY_MS));
 
-async function demo<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
+async function demo<T>(path: string, body: Record<string, unknown>): Promise<T> {
   await wait();
   if (path === "/auth/signup" && body.username === "taken") {
-    throw new AuthError("that username is already taken.", 409, "USERNAME_TAKEN");
+    throw new ApiError("that username is already taken.", 409, "USERNAME_TAKEN");
   }
   if (path === "/auth/login" && body.email === "nobody@northeastern.edu") {
-    throw new AuthError("there's no account with that email yet.", 404, "NO_ACCOUNT");
+    throw new ApiError("there's no account with that email yet.", 404, "NO_ACCOUNT");
   }
   if (path === "/auth/verify" && body.code === "0".repeat(CODE_LENGTH)) {
-    throw new AuthError("that code didn't work. check your email and try again.", 400, "INVALID_CODE");
+    throw new ApiError("that code didn't work. check your email and try again.", 400, "INVALID_CODE");
   }
-  const user = { id: "demo", email: "demo@northeastern.edu" };
-  if (path === "/auth/verify") return { user, onboardingComplete: true } as T;
-  if (path === "/users/me") return { user: { ...user, username: "demo" }, onboardingComplete: true } as T;
+  if (path === "/auth/verify") return { user: { id: "demo", email: body.email }, onboardingComplete: true } as T;
   return {} as T;
 }
 
 const post = <T>(path: string, body: Record<string, unknown>) =>
   DEMO_MODE ? demo<T>(path, body) : request<T>("POST", path, body);
-const get = <T>(path: string) => (DEMO_MODE ? demo<T>(path) : request<T>("GET", path));
 
 // ---------------------------------------------------------------------------
 
@@ -104,16 +73,6 @@ export const authApi = {
     post<VerifyResult>("/auth/verify", { email: normalizeEmail(email), code: code.trim() }),
   resend: (email: string) => post<object>("/auth/resend", { email: normalizeEmail(email) }),
   logout: () => post<object>("/auth/logout", {}),
-
-  // The logged-in student, or null when logged out. Use this to guard pages.
-  me: async (): Promise<Me | null> => {
-    try {
-      return await get<Me>("/users/me");
-    } catch (err) {
-      if (err instanceof AuthError && err.status === 401) return null;
-      throw err;
-    }
-  },
 
   // Last step of signup; needs the session from verify.
   // The email isn't sent: the backend takes it from the session.

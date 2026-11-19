@@ -12,7 +12,8 @@ dotenv.config({ path: envPath });
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SECRET_KEY;
 
-// Create the admin client for your backend
+// Admin client for the backend. It bypasses row-level security, so every
+// query must filter to the logged-in student itself.
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // A fresh client for each auth call. Never reuse one shared client for
