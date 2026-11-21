@@ -8,8 +8,8 @@ import { BoothLink, ChatHeader } from "@/components/chat-booth/chat-header";
 import { PhotoStrip } from "@/components/chat-booth/photo-strip";
 import { focusRing } from "@/components/chat-booth/styles";
 import { SidequestMark } from "@/components/sidequest-mark";
+import { authApi, clearStrip, getStripJson, parseStrip, subscribeHandoff } from "@/lib/auth";
 import { LOGIN_REDIRECT } from "@/lib/config";
-import { clearStrip, getStripJson, parseStrip, subscribeHandoff } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export function DoneView() {
@@ -19,7 +19,9 @@ export function DoneView() {
   if (json === undefined) return null;
   const strip = parseStrip(json);
 
-  function signUpSomeoneElse() {
+  async function signUpSomeoneElse() {
+    // This student is logged in now; log them out before the next one starts.
+    await authApi.logout().catch(() => {});
     clearStrip();
     router.push("/signup");
   }

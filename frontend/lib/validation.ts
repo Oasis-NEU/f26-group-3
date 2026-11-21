@@ -1,14 +1,16 @@
 // Signup and login rules. Each validator returns an error message for the
-// chat, or null when the value is fine. The backend must enforce the same
-// rules; these only give fast feedback.
+// chat, or null when the value is fine. The backend enforces the same rules
+// (backend/utils/signupRules.js); these only give fast feedback.
 
 import { STUDENT_EMAIL_DOMAIN } from "@/lib/config";
 
 export const USERNAME_PATTERN = /^[a-z0-9._]{3,20}$/i;
-export const PASSWORD_MIN_LENGTH = 12;
 export const FIRST_NAME_MAX = 40;
 export const MAJOR_MAX = 60;
+// Must match "Email OTP Length" in the Supabase dashboard.
 export const CODE_LENGTH = 6;
+// Same as NEU_EMAIL in backend/utils/signupRules.js (input is lowercased first).
+const STUDENT_EMAIL = /^[a-z0-9._%+-]+@northeastern\.edu$/;
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -28,16 +30,7 @@ export function validateUsername(value: string) {
 export function validateEmail(value: string) {
   const email = normalizeEmail(value);
   if (!email) return "you'll need your student email.";
-  const [local, domain, extra] = email.split("@");
-  const ok = local && domain !== undefined && extra === undefined && `@${domain}` === STUDENT_EMAIL_DOMAIN;
-  return ok ? null : `that needs to be a ${STUDENT_EMAIL_DOMAIN} address.`;
-}
-
-export function validatePassword(value: string, email: string) {
-  if (value.length < PASSWORD_MIN_LENGTH) return `passwords need at least ${PASSWORD_MIN_LENGTH} characters.`;
-  const local = normalizeEmail(email).split("@")[0];
-  if (local && value.toLowerCase().includes(local)) return "your password can't contain your email name.";
-  return null;
+  return STUDENT_EMAIL.test(email) ? null : `that needs to be a ${STUDENT_EMAIL_DOMAIN} address.`;
 }
 
 export function validateFirstName(value: string) {
@@ -52,12 +45,6 @@ export function validateMajor(value: string) {
 
 export function validateChoice(options: string[], what: string) {
   return (value: string) => (options.includes(value) ? null : `pick your ${what} from the options.`);
-}
-
-// Login accepts either a username or a student email.
-export function validateIdentifier(value: string) {
-  if (!value.trim()) return "i'll need your username or student email.";
-  return value.includes("@") ? validateEmail(value) : validateUsername(value);
 }
 
 export function validateCode(value: string) {

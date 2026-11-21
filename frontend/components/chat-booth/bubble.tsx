@@ -10,7 +10,7 @@ const variants = {
 type BubbleProps = {
   from: keyof typeof variants;
   children: React.ReactNode;
-  // Hints are quieter app messages (password rules and the like).
+  // Hints are quieter app messages (format rules and the like).
   tone?: "hint";
   className?: string;
 };

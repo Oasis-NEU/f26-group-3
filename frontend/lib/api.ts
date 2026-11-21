@@ -1,5 +1,5 @@
 // Shared fetch helper for the Express backend. Sends the session cookies and
-// turns error responses ({ error, code?, field?, email? }) into ApiError.
+// turns error responses ({ error, code?, field? }) into ApiError.
 
 import { API_URL } from "@/lib/config";
 
@@ -8,7 +8,6 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public code?: string,
-    public email?: string,
     public field?: string,
   ) {
     super(message);
@@ -34,7 +33,6 @@ export async function request<T>(method: "GET" | "POST" | "PATCH", path: string,
       data.error ?? "something went wrong. please try again.",
       res.status,
       data.code,
-      data.email,
       data.field,
     );
   }

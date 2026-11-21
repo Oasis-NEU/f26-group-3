@@ -1,16 +1,21 @@
 // The one module that talks to the auth API. In demo mode (lib/config.ts)
 // the same functions return fake responses so the flow works without a backend.
+// The logged-in student's profile lives in lib/profile.ts.
 
 import { ApiError, request } from "@/lib/api";
 import { DEMO_DELAY_MS, DEMO_MODE } from "@/lib/config";
 import { CODE_LENGTH, normalizeEmail, normalizeUsername } from "@/lib/validation";
 
+// Auth failures are ordinary API errors; the alias keeps existing imports working.
+export { ApiError as AuthError } from "@/lib/api";
+
 export const RESEND_COOLDOWN_SECONDS = 60;
 
+// Everything the signup chat collects. When saving the profile, `email` is
+// only checked against the session's; the backend saves the session's.
 export type SignupPayload = {
   username: string;
   email: string;
-  password: string;
   firstName: string;
   gender: string;
   year: string;
@@ -19,73 +24,73 @@ export type SignupPayload = {
   interests: string[];
 };
 
-export type LoginResult = { onboardingComplete: boolean };
+export type VerifyResult = { user: { id: string; email: string }; onboardingComplete: boolean };
 
-// Auth failures are ordinary API errors; the alias keeps existing imports working.
-export { ApiError as AuthError } from "@/lib/api";
-
-// Expected backend contract (POST, JSON, cookies for the session):
-//   /api/auth/signup  SignupPayload             -> 201 {}            (emails a code)
-//   /api/auth/verify  { email, code }           -> 200 {}            (sets session cookie)
-//   /api/auth/resend  { email }                 -> 200 {}
-//   /api/auth/login   { identifier, password }  -> 200 LoginResult   (sets session cookie)
-//   /api/auth/logout  {}                        -> 200 {}            (clears session cookie)
-// `identifier` is a username or a student email.
+// Backend contract (JSON; the session lives in HTTP-only cookies the browser
+// sends automatically, so this code never sees a token). Sign-in is
+// passwordless: routes that email something send a one-time code.
+//   POST /api/auth/signup       { username, email }  -> 201 {}             (emails a code)
+//   POST /api/auth/login        { email }            -> 200 {}             (emails a code if the account exists)
+//   POST /api/auth/resend       { email }            -> 200 {}
+//   POST /api/auth/verify       { email, code }      -> 200 VerifyResult   (sets session cookies)
+//   POST /api/auth/logout       {}                   -> 200                (clears them)
+//   POST /api/users/me/profile  profile answers      -> 201                (needs the session)
 // Errors: { error: string, code?: string } with a 4xx/5xx status, e.g.
 //   409 { code: "USERNAME_TAKEN" } from signup,
-//   403 { code: "UNVERIFIED", email } from login.
-
-const post = <T>(path: string, body: unknown) => request<T>("POST", `/auth${path}`, body);
+//   403 { code: "WRONG_ACCOUNT" } from saving a profile while logged in as another email.
+// Signup and login never say whether an email has an account.
 
 // --- demo mode -------------------------------------------------------------
-// Error triggers: username "taken" (signup), password "wrongpass" (login),
-// code "000000" (verify).
+// Error triggers: username "taken" (signup), code "000000" (verify).
+// Demo mode is always "logged in".
 
 const wait = () => new Promise((resolve) => setTimeout(resolve, DEMO_DELAY_MS));
 
 async function demo<T>(path: string, body: Record<string, unknown>): Promise<T> {
   await wait();
-  if (path === "/signup" && body.username === "taken") {
+  if (path === "/auth/signup" && body.username === "taken") {
     throw new ApiError("that username is already taken.", 409, "USERNAME_TAKEN");
   }
-  if (path === "/login" && body.password === "wrongpass") {
-    throw new ApiError("that password doesn't match. try again?", 401, "INVALID_CREDENTIALS");
-  }
-  if (path === "/verify" && body.code === "0".repeat(CODE_LENGTH)) {
+  if (path === "/auth/verify" && body.code === "0".repeat(CODE_LENGTH)) {
     throw new ApiError("that code didn't work. check your email and try again.", 400, "INVALID_CODE");
   }
-  return (path === "/login" ? { onboardingComplete: true } : {}) as T;
+  if (path === "/auth/verify") return { user: { id: "demo", email: body.email }, onboardingComplete: true } as T;
+  return {} as T;
 }
 
-const call = <T>(path: string, body: Record<string, unknown>) =>
-  DEMO_MODE ? demo<T>(path, body) : post<T>(path, body);
+const post = <T>(path: string, body: Record<string, unknown>) =>
+  DEMO_MODE ? demo<T>(path, body) : request<T>("POST", path, body);
 
 // ---------------------------------------------------------------------------
 
-export function normalizeIdentifier(identifier: string) {
-  return identifier.includes("@") ? normalizeEmail(identifier) : normalizeUsername(identifier);
-}
-
 export const authApi = {
-  signup: (payload: SignupPayload) =>
-    call<object>("/signup", {
-      ...payload,
-      username: normalizeUsername(payload.username),
-      email: normalizeEmail(payload.email),
-      firstName: payload.firstName.trim(),
-      major: payload.major.trim(),
+  signup: (username: string, email: string) =>
+    post<object>("/auth/signup", { username: normalizeUsername(username), email: normalizeEmail(email) }),
+  login: (email: string) => post<object>("/auth/login", { email: normalizeEmail(email) }),
+  verify: (email: string, code: string) =>
+    post<VerifyResult>("/auth/verify", { email: normalizeEmail(email), code: code.trim() }),
+  resend: (email: string) => post<object>("/auth/resend", { email: normalizeEmail(email) }),
+  logout: () => post<object>("/auth/logout", {}),
+
+  // Last step of signup; needs the session from verify. The backend rejects
+  // it if the session belongs to a different email.
+  saveProfile: (data: SignupPayload) =>
+    post<object>("/users/me/profile", {
+      email: normalizeEmail(data.email),
+      username: normalizeUsername(data.username),
+      firstName: data.firstName.trim(),
+      gender: data.gender,
+      year: data.year,
+      major: data.major.trim(),
+      campus: data.campus,
+      interests: data.interests,
     }),
-  verify: (email: string, code: string) => call<object>("/verify", { email: normalizeEmail(email), code: code.trim() }),
-  resend: (email: string) => call<object>("/resend", { email: normalizeEmail(email) }),
-  login: (identifier: string, password: string) =>
-    call<LoginResult>("/login", { identifier: normalizeIdentifier(identifier), password }),
-  logout: () => call<object>("/logout", {}),
 };
 
 // --- hand-off between pages --------------------------------------------------
-// sessionStorage carries the email being verified and the finished strip to
-// /verify and /signup/done. It never holds the password. Next keeps visited
-// pages mounted (hidden), so readers subscribe and re-render on every write.
+// sessionStorage carries the email being verified (login -> /verify) and the
+// finished strip (-> /signup/done). Next keeps visited pages mounted (hidden),
+// so readers subscribe and re-render on every write.
 
 const PENDING_EMAIL_KEY = "sidequest:pending-email";
 const STRIP_KEY = "sidequest:strip";
